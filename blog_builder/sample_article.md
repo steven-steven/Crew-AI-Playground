@@ -1,0 +1,93 @@
+- Multi AI agent systems with crewai
+- ai agent working together
+- making songs
+- action automation used to be A to C. More complex: edge case if A do C..
+- traditionally, you know inputs, transformations, output - can be replicated.
+- in AI software development, your inputs are fuzzy (open-ended, user defined), transformation is fuzzy because its LLM, you don't know what the output will be.  Probabilistic - different response all the time. Valuable too, because the world is fuzzy.
+- Data collection and analysis
+	- before: website visitor > classify leads > prioritize sales
+	- after: website visitor > lead > crew of AI agents (research online/dataset, draw comparisons, scoring, come up with talking points with the customer) > Sales
+- With LLM, you can be a blocker. You have to be there giving feedback at all steps. AI agents let them work autonomously. You get an agent when LLM can ask itself questions and move on with their thinking process on their own. Agents can interact with tools / external world (API, gather data points)
+- multi-agent systems: task another agent. One agent can do one thing well (ie. researcher, writer). You can write them in different LLM model sources. (gpt-3/5-turbo, jiggomgface. mistral api, cohere, llama)
+- crewai - open source framework. Bring your agents to production.
+- LLM perform better when theyre role playing
+- Labs
+	- see granular log by setting verbose 1/2
+	- ex. content planner gives an outline of the research, content writer use the previous content plan to put together a markdown blogpost, the editor proofreads.
+	- can write documentation.
+- Building blocks
+	- Agents
+		- agent is defined with role (ie. content planner), goal ('Plan engaging and factually accurate content on {topic}'), backstory (the role description)
+	- Tasks
+		- tasks is defined with `description`(what you expect your agent to do), `expected_output` (what to produce as final outcome), `agent` (assign to the agent)
+	- Crew
+		- crew puts together agent and tasks to operate as unit. Define list of agents and tasks. Crew operate sequentially by default (order of tasks matter. input to the next step)
+		- run `result = crew.kickoff(inputs={"topic":"AI"})`
+- how agent gets better
+	- role playing - allow them to tailor their response wording to your context.
+	- focus - context window is limited. When TMI / too much context the agent missed important information and can hallucinate. (use multiple agents)
+	- tools - too much confuse them.
+	- cooperation - bounce ideas with each other. Take feedback, delegate tasks.
+	- guardrails - get reliable results
+	- memory - ability to remember what it has done. Use recollection for new execution. Crewai have long-term (stored after execution for any future task), short-term (share context during crew execution), entity memory (stores subject discussed)
+- Lab: customer support automation
+	- tap into docs
+	- you have a senior support representative & support QA specialist to ensure the rep is providing best support possible. Let the QA `allow_delegation` (the default), so it can give feedback to the rep agent - they wont try to do it themselves. The rep agent has it false so they have to do it themselves.
+	- allow_delegation gives them the option to do so, but is not necessary.
+	- Crew AI have tools
+		- SerperDevTool - ext service to search google (search)
+		- ScrapeWebsiteTool - access and extract content from url (scrape)
+		- websitesearchtool - semantic search (does a RAG) over the websites
+		- custom tools. Ie. load customer data, tap into previous conversations, load db, check ongoing tickets / feature requests / bug reports...
+		- ```
+		  docs_scrape_tool = ScrapeWebsiteTool(
+		      website_url="https://docs.crewai.com/how-to/Creating-a-Crew-and-kick-it-off/"
+		  )
+		  ```
+		- or leave website url empty to look at all internet
+		- you can assign tools at (1) agent level - can use it on any task it performs (2) task level - only use the tool for that task. 2 overrides 1
+	- let the rep be able to scrape the docs, based on the interpolated input.
+	- the qa doesnt need the input / tools, but just review the response from the other agent. The expected output is a final response to customer, making sure its on the right tone and perfect. (you dont have to specify that it should give feedback to the rep. It will do it when necessary)
+	- creating the crew with `memory=True` enables all 3 types of memory
+	- kickoff the crew with customer, inquiry
+	- note: when running, you could see what qa thinks and the action it takes (delegate back with the input for the other agent)
+- mental framework - think like a manager
+	- what is the goal, what is the process, what kind of people would I need to hire to get it done? (role, backstory, goals)
+	- ~~Researcher~~ HR Research Specialist
+	- ~~Writer~~ Senior copywriter
+- what makes a tool great?
+	- versatile - handle all types of fuzzy input you throw at it and transform it to strongly typed output (ie. json)
+	- Fault tolerant - handle exception & self-heal. ie. ask agent to retry given error message (crew ai does it automatically)
+	- Caching - prevent unnecessary requests, stay in rate limits, save time. Crew ai use cross-agent caching
+- Lab: customer outreach campaign
+	- tools: DirectoryReadTool, FileReadTool, ServerDevTools
+	- in the files, you have different playbooks on how to respond to engage with specific company (iel. tech startups, enterprise solutions, small business.) - more tailored prompts configuration
+	- creating a custom tool - inherit crew ai's BaseTool
+		- ie. SentimentAnalysisTool - analyze text to ensure positive and engaging
+		- the _run method implements and returns result
+	- have a sales rep agent that analyzes and profiles the customer like their needs, areas of value, suggesting strategies to personalize engagement (has access to reading the directory and files, and search internet). Then we have another lead sales rep agent that use the profile report to craft the outreach campaign in the form of email drafts. Ensuring the tone is engaging and professional (it has access to sentiment tool and search tool)
+- Well defined tasks
+	- how do you delegate work to those you hire. Which process/task do I expect the team member to do?
+	- a clear task description, set clear and concise expectation, set context, set a callback, override agent tools, force human input, execute async, ouput as json/file, ... (lots of options)
+- Lab: agent to plan an event
+	- we'll use serperdevtool to go to google, and scrapewebsitetool to parse those sites.
+	- agent 1 is venue coordinator - find venue options based on event requirements/constraints, agent 2 is logistic manager - from those venue options, think about logistics and how it'll work out, agent 3 is marketing agent figure out how we can market this meetup. Bring the venue and logistics together to market.
+	- Pydantic BaseModel - a strongly typed  base class you can use as agent output so they populate this obj.
+		- define a `VenueDetails` class inheriting from basemodel, and have list of attributes.
+		- transform fuzzy output to strong type
+		- useful in using agents in systems without needing API - just call it and read the agent response as a structured object.
+	- the first task find venue in city and output details of all venues chosen, `output_json=VenueDetails` (populate VenueDetails obj and output it as json)
+	- `async_execution=True` run tasks in parallel
+		- the logistic manager depends on venue coordinator, but has nothing to do with marketing. (they can execute in parallel, so both can set as async)
+	- `human_input=True` when task finish it ask for human feedback before moving on
+- Agent collaboration
+	- one agent pass task output to the next
+	- moving from sequential process to hierarchical (one point delegate to others, reviews their work), async in parallel. Think like a manager, organize agents to different tasks & process
+- Lab: financial analysis (see how market is doing)
+	- 4 agents. a data analyst to monitor and analyze market, finding trends and predicting movements. Use ML and statistical model to provide insights, inform trading decisions. A trading strategy dev to test various trading strategies. A trade advisor suggest optimal execution strategies, analyze timing/price/logistics of trade to make sure its efficient. A risk advisor to provide insights on risk associated with trade, suggest safeguards to ensure activities align with risk tolearance.
+	- pass the `Process` class when initializing crew, to set structure of how agents will work together. I.e. `process=Process.hierarchical` will auto create a 'manager' that delegates the work around.
+- Lab: tailor job application
+	- Goal: maximize chances of getting interview. Process: learn job requirements, cross it with your skill set and experiences, reshape resume to highlight relevant areask, rewrite resume with appropriate language, set talking point for interview.
+	- tools: serperdevtool, scrapewebsitetool, filereadtool (the resume markdown), mdxsearchtool (do a rag/semantic search over the markdown file)
+	- agents: tech job researcher - analyze job posting, needs behind the job posting, what type of person they're hiring. Profiler - research on job applicants and find cross over and good match. Highlight the things thats relevant. Resume Strategist - write the intersection down. Interview Preparer - put together q/a and talking points.
+	- tasks: one per role. a research task that analyze the job posting, a profiler that profiles a personal writeup note + your github url, a resume strategy task outputing the new resume markdown file, passing in context from the previous 2 tasks that run async. Finally, an interview preperation task outputing another markdown, and using the context of previous 3.
